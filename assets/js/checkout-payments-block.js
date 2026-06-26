@@ -1,67 +1,85 @@
-const settings = window.wc.wcSettings.getSetting("payment_gateway_name_data", {});
-// console.log(settings);
-// console.log("==============================");
-const label =
-  window.wp.htmlEntities.decodeEntities(settings.title) ||
-  window.wp.i18n.__("WooCommerce BoliterPlate payment CommercePro Plugin", "wc-payments");
-const PaymentGatewayimage = window.wp.htmlEntities.decodeEntities(settings.PaymentGatewayimage);
+/**
+ * WooCommerce Payment Gateway Boilerplate
+ * Block-Based Checkout — Frontend Payment Method Registration
+ *
+ * This file registers the payment method with the WooCommerce Blocks
+ * registry so it appears in the Gutenberg block-based checkout.
+ *
+ * Data available via: window.wc.wcSettings.getSetting( 'pg_boilerplate_data', {} )
+ */
 
-const Content = () => {
-  const description = settings.description;
-  return description;
-};
+( function () {
 
-// Add Image With a wc-payments title
-const PaymentBlock = () => {
-  return Object(window.wp.element.createElement)(
-    "div",
-    {
-      className: "Wcpayment-content",
-      style: { display: "flex", alignItems: "center", gap: "18px" },
-    },
+    const settings = window.wc.wcSettings.getSetting( 'pg_boilerplate_data', {} );
 
-    Object(window.wp.element.createElement)("div", null, label),
-    Object(window.wp.element.createElement)("img", {
-      src: PaymentGatewayimage,
-      alt: "payment Logo",
-      style: { width: "25%", marginBottom: "10px", marginTop: "10px" },
-    })
-  );
-};
+    const label = window.wp.htmlEntities.decodeEntities( settings.title )
+        || window.wp.i18n.__( 'Custom Payment', 'wc-pg-boilerplate' );
 
-const Block_Gateway = {
-  name: "payment_gateway_name",
-  label: Object(window.wp.element.createElement)(PaymentBlock, null),
-  content: Object(window.wp.element.createElement)(Content, null),
-  edit: Object(window.wp.element.createElement)(Content, null),
-  canMakePayment: () => {
-    // alert("✅ canMakePayment() called");
-    // console.log("✅ Checking canMakePayment()");
-    return true;
-  },
-  ariaLabel: label,
-  supports: {
-    features: settings.supports,
-  },
-};
-// console.log("====== Block Gateway ==============");
-// console.log(Block_Gateway);
-window.wc.wcBlocksRegistry.registerPaymentMethod(Block_Gateway);
+    const description = window.wp.htmlEntities.decodeEntities( settings.description || '' );
 
-document.addEventListener('DOMContentLoaded', () => {
+    const icon = settings.icon || '';
 
-  const observer = new MutationObserver((mutationsList, observer) => {
-      const getTitleDiv = document.querySelector('#radio-control-wc-payment-method-options-payment_gateway_name__label');
+    /**
+     * The label component shown next to the radio button.
+     * Renders the gateway title and optionally a logo.
+     */
+    const PaymentMethodLabel = () => {
+        const labelText = window.wp.element.createElement(
+            'span',
+            { className: 'wc-pg-boilerplate__label' },
+            label
+        );
 
-      if (getTitleDiv) {
-          // console.log("===========================");
-          getTitleDiv.classList = '';
-          observer.disconnect(); 
-      }
-  });
+        if ( ! icon ) {
+            return labelText;
+        }
 
-  observer.observe(document.body, {
-      childList: true,
-      subtree: true
-  });
-});
+        const logoImage = window.wp.element.createElement( 'img', {
+            src:       icon,
+            alt:       label,
+            className: 'wc-pg-boilerplate__icon',
+            style:     { height: '24px', verticalAlign: 'middle', marginLeft: '8px' },
+        } );
+
+        return window.wp.element.createElement(
+            'span',
+            { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+            labelText,
+            logoImage
+        );
+    };
+
+    /**
+     * The content component shown below the radio button when this
+     * payment method is selected.
+     */
+    const PaymentMethodContent = () => {
+        if ( ! description ) {
+            return null;
+        }
+
+        return window.wp.element.createElement(
+            'p',
+            { className: 'wc-pg-boilerplate__description' },
+            description
+        );
+    };
+
+    /**
+     * Register the payment method with the WooCommerce Blocks registry.
+     */
+    const blockGateway = {
+        name:            'pg_boilerplate',
+        label:           window.wp.element.createElement( PaymentMethodLabel, null ),
+        content:         window.wp.element.createElement( PaymentMethodContent, null ),
+        edit:            window.wp.element.createElement( PaymentMethodContent, null ),
+        canMakePayment:  () => true,
+        ariaLabel:       label,
+        supports: {
+            features: settings.supports || [ 'products' ],
+        },
+    };
+
+    window.wc.wcBlocksRegistry.registerPaymentMethod( blockGateway );
+
+} )();

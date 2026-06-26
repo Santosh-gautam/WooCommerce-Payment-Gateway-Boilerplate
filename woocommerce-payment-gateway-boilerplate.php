@@ -1,114 +1,148 @@
 <?php
-/*
-Plugin Name:  WooCommerce Payment Gateway Boilerplate
-Plugin URI: https://www.hisantosh.com
-Description: A custom WooCommerce payment gateway for Wordpress WooCommerce Payments.
-Version: 1.0.0
-Author: Santosh Gautam
-Author URI: https://www.hisantosh.com
-Tags: payment, gateway
-Requires at least: 5.3
-Tested up to: 6.7.1
-Stable tag: 1.0.0
-Requires PHP: 7.4
-License: GPL v3 or later
-Woo: 7310302:82f4a3fafb07f086f3ebac34a6a03729
-License URI: https://www.gnu.org/licenses/gpl-2.0.html
-Copyright: © 2025, Wordpress WooCommerce Payment. All rights reserved.
-*/
+/**
+ * Plugin Name:  WooCommerce Payment Gateway Boilerplate
+ * Plugin URI:   https://www.hisantosh.com
+ * Description:  A professional, generic boilerplate for building a custom WooCommerce payment gateway. Replace TODO comments with your payment gateway's API logic.
+ * Version:      2.0.0
+ * Author:       Santosh Gautam
+ * Author URI:   https://www.hisantosh.com
+ * Tags:         payment, gateway, woocommerce, boilerplate
+ * Requires at least: 5.6
+ * Tested up to: 6.7.1
+ * Requires PHP: 7.4
+ * WC requires at least: 5.0
+ * WC tested up to: 9.0
+ * License:      GPL v3 or later
+ * License URI:  https://www.gnu.org/licenses/gpl-3.0.html
+ * Text Domain:  wc-pg-boilerplate
+ * Copyright:    © 2025, Santosh Gautam. All rights reserved.
+ */
 
-if (!defined('ABSPATH')) {
-    // Exit if accessed directly
-    exit;
+if ( ! defined( 'ABSPATH' ) ) {
+    exit; // Exit if accessed directly.
 }
 
 /*===========================================================
---------- Ensure WooCommerce is active ---------------- 
-=========================================================== */
-function check_woocommerce_exist()
-{
-    if (!class_exists('WooCommerce')) {
-        add_action('admin_notices', function () {
-            echo '<div class="error"><p><strong>Payments requires WooCommerce to be active.</strong></p></div>';
-        });
-        return;
+ * Plugin Constants
+ *=========================================================== */
+define( 'WC_PG_BOILERPLATE_VERSION',  '2.0.0' );
+define( 'WC_PG_BOILERPLATE_DIR_PATH', plugin_dir_path( __FILE__ ) );
+define( 'WC_PG_BOILERPLATE_DIR_URL',  plugin_dir_url( __FILE__ ) );
+
+/*===========================================================
+ * 1. Declare HPOS Compatibility
+ *=========================================================== */
+add_action( 'before_woocommerce_init', function () {
+    if ( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
+        \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', __FILE__, true );
+        \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'cart_checkout_blocks', __FILE__, true );
     }
+} );
+
+/*===========================================================
+ * 2. WooCommerce Active Check
+ *    If WC is not active, show an admin notice and bail out.
+ *=========================================================== */
+add_action( 'plugins_loaded', 'wc_pg_boilerplate_init', 0 );
+
+function wc_pg_boilerplate_init() {
+
+    if ( ! class_exists( 'WooCommerce' ) ) {
+        add_action( 'admin_notices', 'wc_pg_boilerplate_missing_wc_notice' );
+        return; // Stop loading anything else.
+    }
+
+    // WooCommerce is active — load the gateway.
+    wc_pg_boilerplate_load_gateway();
 }
-add_action('plugins_loaded', 'check_woocommerce_exist');
+
+/**
+ * Admin notice shown when WooCommerce is not active.
+ */
+function wc_pg_boilerplate_missing_wc_notice() {
+    /* translators: %s: WooCommerce download URL */
+    $message = sprintf(
+        __( '<strong>WooCommerce Payment Gateway Boilerplate</strong> requires <a href="%s" target="_blank">WooCommerce</a> to be installed and active.', 'wc-pg-boilerplate' ),
+        esc_url( 'https://woocommerce.com/' )
+    );
+    echo '<div class="notice notice-error"><p>' . wp_kses_post( $message ) . '</p></div>';
+}
 
 /*===========================================================
---------- Included Files ---------------- 
-=========================================================== */
-require_once plugin_dir_path(__FILE__) . 'templates/checkout.php';
+ * 3. Register Payment Gateway
+ *=========================================================== */
+function wc_pg_boilerplate_load_gateway() {
 
-/*===========================================================
----------  Register Payment Gateway ---------------- 
-=========================================================== */
-function register_payment_gateway($gateways)
-{
-    require_once plugin_dir_path(__FILE__) . 'includes/class-wc-payments-gateway.php';
-    $gateways['payment_gateway_name'] = 'WC_Gateway_Payment_Gateway_Boilerplate';
+    // Load template for Block Checkout registration.
+    require_once WC_PG_BOILERPLATE_DIR_PATH . 'templates/checkout.php';
+
+    // Register gateway class with WooCommerce.
+    add_filter( 'woocommerce_payment_gateways', 'wc_pg_boilerplate_register_gateway' );
+}
+
+function wc_pg_boilerplate_register_gateway( $gateways ) {
+    require_once WC_PG_BOILERPLATE_DIR_PATH . 'includes/class-wc-payments-gateway.php';
+    $gateways[] = 'WC_Gateway_PG_Boilerplate';
     return $gateways;
 }
-add_filter('woocommerce_payment_gateways', 'register_payment_gateway');
-
-/*====================================================================================
- --------- Add plugin action links(show with a Deactivate button) ---------------- 
- ====================================================================================== */
-
-function admin_plugin_action_links($links, $file)
-{
-
-    if ($file === plugin_basename(__FILE__)) {
-
-        // Settings link
-        $settings_url = admin_url('admin.php?page=wc-settings&tab=checkout&section=payment_gateway_name');
-        $settings_link = '<a href="' . esc_url($settings_url) . '">Settings</a>';
-
-        // Support link(Please Add your Support Link Here)
-        $support_url = 'https://hisantosh.com';
-        $support_link = '<a href="' . esc_url($support_url) . '" target="_blank">Support</a>';
-
-        // Documentation link(Please Add your Documentation Link Here)
-        $documentation_url = 'https://github.com/isantoshg/WooCommerce-Payment-Gateway-Boilerplate/blob/master/README.md';
-        $documentation_link = '<a href="' . esc_url($documentation_url) . '" target="_blank">Docs</a>';
-
-        array_unshift($links, $settings_link, $support_link, $documentation_link);
-    }
-    return $links;
-}
-add_filter('plugin_action_links_' . plugin_basename(__FILE__), 'admin_plugin_action_links', 10, 2);
 
 /*===========================================================
- --------- Enqueue Admin Scripts ---------------- 
- =========================================================== */
- add_action('admin_enqueue_scripts', 'boilerplate_enqueue_admin_scripts');
+ * 4. Plugin Action Links (Settings / Support / Docs)
+ *=========================================================== */
+add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'wc_pg_boilerplate_plugin_action_links' );
 
- function boilerplate_enqueue_admin_scripts($hook) {
-     wp_enqueue_script(
-        'payment_admin_scripts',
-        plugin_dir_url(__FILE__) . 'assets/js/YourJsFileInclueHere.js',
-        array('jquery'),
-        '1.0.0',
+function wc_pg_boilerplate_plugin_action_links( $links ) {
+
+    $settings_url = admin_url( 'admin.php?page=wc-settings&tab=checkout&section=pg_boilerplate' );
+    $extra_links  = array(
+        '<a href="' . esc_url( $settings_url ) . '">' . __( 'Settings', 'wc-pg-boilerplate' ) . '</a>',
+        '<a href="' . esc_url( 'https://hisantosh.com' ) . '" target="_blank">' . __( 'Support', 'wc-pg-boilerplate' ) . '</a>',
+        '<a href="' . esc_url( 'https://github.com/isantoshg/WooCommerce-Payment-Gateway-Boilerplate/blob/master/README.md' ) . '" target="_blank">' . __( 'Docs', 'wc-pg-boilerplate' ) . '</a>',
+    );
+
+    return array_merge( $extra_links, $links );
+}
+
+/*===========================================================
+ * 5. Enqueue Admin Assets — ONLY on WC Settings Page
+ *=========================================================== */
+add_action( 'admin_enqueue_scripts', 'wc_pg_boilerplate_enqueue_admin_assets' );
+
+function wc_pg_boilerplate_enqueue_admin_assets( $hook ) {
+
+    // Only load on the WooCommerce settings page.
+    if ( 'woocommerce_page_wc-settings' !== $hook ) {
+        return;
+    }
+
+    // Only load on the Checkout / Payments tab.
+    // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+    if ( ! isset( $_GET['tab'] ) || 'checkout' !== sanitize_key( $_GET['tab'] ) ) {
+        return;
+    }
+
+    wp_enqueue_style(
+        'wc-pg-boilerplate-admin-style',
+        WC_PG_BOILERPLATE_DIR_URL . 'assets/css/admin-style.css',
+        array(),
+        WC_PG_BOILERPLATE_VERSION
+    );
+
+    wp_enqueue_script(
+        'wc-pg-boilerplate-admin-script',
+        WC_PG_BOILERPLATE_DIR_URL . 'assets/js/admin-script.js',
+        array( 'jquery' ),
+        WC_PG_BOILERPLATE_VERSION,
         true
     );
- }
 
- 
-/*===========================================================
- --------- Enqueue Css ---------------- 
- =========================================================== */
-add_action('admin_enqueue_scripts', 'boilerplate_enqueue_admin_css');
-
-function boilerplate_enqueue_admin_css($hook) {
-    wp_enqueue_style(
-        'payment_admin__style',
-        plugin_dir_url(__FILE__) . 'assets/css/admin-style.css',
-        array(),
-        '1.0.0'
+    // Pass PHP data to admin JS if needed.
+    wp_localize_script(
+        'wc-pg-boilerplate-admin-script',
+        'wcPgBoilerplate',
+        array(
+            'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+            'nonce'   => wp_create_nonce( 'wc_pg_boilerplate_admin_nonce' ),
+        )
     );
 }
-
-
-// echo plugin_dir_url(__FILE__);
-// exit;
