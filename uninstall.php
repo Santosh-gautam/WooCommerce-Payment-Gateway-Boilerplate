@@ -1,65 +1,51 @@
 <?php
 /**
- * PixGrow Uninstall Cleanup
- * Deletes all plugin-related metadata and backup directories when the plugin is deleted.
+ * Uninstall Script — WooCommerce Payment Gateway Boilerplate
  *
- * @package PixGrow
+ * This file runs automatically when a user deletes the plugin
+ * from the WordPress admin (Plugins > Delete).
+ *
+ * It removes any database entries created by this plugin so the
+ * site is left in a clean state.
+ *
+ * IMPORTANT: This file must be named `uninstall.php` and placed
+ * in the plugin root directory.
+ *
+ * @package WC_PG_Boilerplate
  */
 
-// If uninstall is not called from WordPress, exit.
+// Security check — WordPress sets this constant before calling uninstall.php.
+// Never execute if this constant is not defined.
 if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
-	exit;
+    exit;
 }
 
-// Check if the user opted to delete all backups and data on uninstall
-$pixgrow_settings    = get_option( 'pixgrow_settings', array() );
-$pixgrow_delete_data = isset( $pixgrow_settings['delete_data_on_uninstall'] ) ? (int) $pixgrow_settings['delete_data_on_uninstall'] : (int) get_option( 'pixgrow_delete_data_on_uninstall', 0 );
-if ( ! $pixgrow_delete_data ) {
-	// Exit early to preserve image backups and database metadata for the user
-	return;
+/*===========================================================
+ * Remove Gateway Settings from wp_options
+ *
+ * WooCommerce stores gateway settings as a single serialised
+ * option named: woocommerce_{gateway_id}_settings
+ *=========================================================== */
+delete_option( 'woocommerce_pg_boilerplate_settings' );
+
+/*===========================================================
+ * Multisite: Remove options from each sub-site
+ *=========================================================== */
+if ( is_multisite() ) {
+
+    $sites = get_sites( array( 'fields' => 'ids' ) );
+
+    foreach ( $sites as $site_id ) {
+        switch_to_blog( $site_id );
+        delete_option( 'woocommerce_pg_boilerplate_settings' );
+        restore_current_blog();
+    }
 }
 
-global $wpdb;
-
-// 1. Delete all PixGrow attachment metadata records securely
-// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-$wpdb->query(
-	$wpdb->prepare(
-		"DELETE FROM {$wpdb->postmeta} WHERE meta_key LIKE %s",
-		'_pixgrow_%'
-	)
-);
-
-// 2. Delete the local backups directory and all its files recursively
-$pixgrow_upload_dir = wp_upload_dir();
-$pixgrow_backup_salt = get_option( 'pixgrow_backup_salt' );
-$pixgrow_backup_dir  = $pixgrow_backup_salt ? $pixgrow_upload_dir['basedir'] . '/pixgrow/backups-' . $pixgrow_backup_salt : $pixgrow_upload_dir['basedir'] . '/PixGrow/backups';
-$pixgrow_log_dir     = $pixgrow_backup_salt ? $pixgrow_upload_dir['basedir'] . '/pixgrow/logs-' . $pixgrow_backup_salt : $pixgrow_upload_dir['basedir'] . '/PixGrow/logs';
-
-if ( file_exists( $pixgrow_backup_dir ) || file_exists( $pixgrow_log_dir ) ) {
-	require_once ABSPATH . 'wp-admin/includes/file.php';
-	WP_Filesystem();
-	global $wp_filesystem;
-	if ( $wp_filesystem ) {
-		if ( file_exists( $pixgrow_backup_dir ) ) {
-			$wp_filesystem->delete( $pixgrow_backup_dir, true );
-		}
-		if ( file_exists( $pixgrow_log_dir ) ) {
-			$wp_filesystem->delete( $pixgrow_log_dir, true );
-		}
-		$pixgrow_parent_dir = $pixgrow_upload_dir['basedir'] . '/PixGrow';
-		if ( is_dir( $pixgrow_parent_dir ) ) {
-			$pixgrow_temp_files = array_diff( @scandir( $pixgrow_parent_dir ), array( '.', '..' ) );
-			if ( empty( $pixgrow_temp_files ) ) {
-				$wp_filesystem->delete( $pixgrow_parent_dir, true );
-			}
-		}
-	}
-}
-
-// Delete the backup salt option
-delete_option( 'pixgrow_backup_salt' );
-
-// 3. Clean up the uninstall setting option itself
-delete_option( 'pixgrow_delete_data_on_uninstall' );
-delete_option( 'pixgrow_settings' );
+/*===========================================================
+ * TODO: Remove any custom database tables your gateway
+ *       created (if applicable).
+ *
+ * global $wpdb;
+ * $wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}pg_boilerplate_transactions" );
+ *=========================================================== */
